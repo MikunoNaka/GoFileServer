@@ -8,6 +8,7 @@ import (
 	"github.com/gotk3/gotk3/gtk"
 	"context"
 	"sync"
+	"fmt"
 )
 
 func serve(port, dir string, wg *sync.WaitGroup) *http.Server {
@@ -67,6 +68,7 @@ func onActivate(app *gtk.Application) {
 	var on = false
 	var server *http.Server
 	buttonSwitch.Connect("clicked", func() {
+		// TODO: validate dir and port
 		port, _ := portInput.GetText()
 		dir, _ := dirInput.GetText()
 
@@ -77,11 +79,16 @@ func onActivate(app *gtk.Application) {
 				killServerDone := &sync.WaitGroup{}
 				server = serve(port, dir, killServerDone)
 				killServerDone.Add(1)
+				// do this after server starts
 				on = true
 				buttonSwitch.SetLabel("Stop")
+				statusLabel.SetText(fmt.Sprintf("Serving directory '%s' on PORT %s", dir, port))
+
 				killServerDone.Wait()
+				// do this after server shuts down
 				on = false
 				buttonSwitch.SetLabel("Start")
+				statusLabel.SetText("")
 			}()
 		}
 	})
