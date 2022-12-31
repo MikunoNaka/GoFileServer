@@ -57,6 +57,9 @@ func onActivate(app *gtk.Application) {
 	dirInput, _ := gtk.EntryNew()
 	dirInput.SetText(DEFAULT_DIR)
 	dirBox.PackEnd(dirInput, false, false, 5)
+
+	browseButton, _ := gtk.FileChooserButtonNew("Browse", gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER)
+	dirBox.PackEnd(browseButton, false, false, 5)
 	box.PackStart(dirBox, false, false, 5)
 
 	portBox, _ := gtk.BoxNew(gtk.ORIENTATION_HORIZONTAL, 0)
@@ -75,6 +78,10 @@ func onActivate(app *gtk.Application) {
 
 	statusLabel, _ := gtk.LabelNew("")
 	box.PackStart(statusLabel, false, true, 10)
+
+	browseButton.Connect("selection-changed", func() {
+		dirInput.SetText(browseButton.GetFilename())
+	})
 
 	var on = false
 	var server *http.Server
