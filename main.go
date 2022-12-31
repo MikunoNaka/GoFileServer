@@ -3,14 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
+	"log"
 	"strconv"
 	"sync"
-
 	"github.com/gotk3/gotk3/glib"
 	"github.com/gotk3/gotk3/gtk"
+	"github.com/gotk3/gotk3/pango"
 )
 
 var (
@@ -23,14 +23,12 @@ func serve(port, dir string, wg *sync.WaitGroup) *http.Server {
     server := &http.Server{Addr: ":" + port, Handler: mux}
 
 	if port == "" { port = DEFAULT_PORT }
-	if dir == "" { dir = DEFAULT_DIR }
 
     go func() {
         defer wg.Done()
 
         if err := server.ListenAndServe(); err != http.ErrServerClosed {
-			// TODO: show error in GTK error window
-            log.Printf("Error while running HTTP server: %v\n", err)
+			log.Fatalf("Error while running the server: %v\n", err)
         }
     }()
 
@@ -47,18 +45,16 @@ func main() {
 func onActivate(app *gtk.Application) {
 	win, _ := gtk.ApplicationWindowNew(app)
 	win.SetTitle("HTTP File Server")
-	win.SetDefaultSize(400, 400)
+	win.SetDefaultSize(330, 230)
+	win.SetResizable(false)
+	win.SetPosition(gtk.WIN_POS_CENTER)
 
 	box, _ := gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 0)
 
 	dirBox, _ := gtk.BoxNew(gtk.ORIENTATION_HORIZONTAL, 0)
 	dirLabel, _ := gtk.LabelNew("Directory to serve: ")
 	dirBox.PackStart(dirLabel, false, false, 5)
-	dirInput, _ := gtk.EntryNew()
-	dirInput.SetText(DEFAULT_DIR)
-	dirBox.PackEnd(dirInput, false, false, 5)
-
-	browseButton, _ := gtk.FileChooserButtonNew("Browse", gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER)
+	browseButton, _ := gtk.FileChooserButtonNew("Browse Directory To Serve", gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER)
 	dirBox.PackEnd(browseButton, false, false, 5)
 	box.PackStart(dirBox, false, false, 5)
 
@@ -71,27 +67,27 @@ func onActivate(app *gtk.Application) {
 	box.PackStart(portBox, false, false, 5)
 
 	buttonBox, _ := gtk.BoxNew(gtk.ORIENTATION_HORIZONTAL, 0)
-	buttonSwitch, _ := gtk.ToggleButtonNew()
-	buttonSwitch.SetLabel("Start")
+	buttonSwitch, _ := gtk.ButtonNewWithLabel("Start")
 	buttonBox.PackStart(buttonSwitch, true, true, 0)
 	box.PackStart(buttonBox, false, false, 5)
 
 	statusLabel, _ := gtk.LabelNew("")
+	statusLabel.SetLineWrap(true)
+	statusLabel.SetLineWrapMode(pango.WrapMode(gtk.ALIGN_START))
+	statusLabel.SetJustify(gtk.JUSTIFY_CENTER)
 	box.PackStart(statusLabel, false, true, 10)
-
-	browseButton.Connect("selection-changed", func() {
-		dirInput.SetText(browseButton.GetFilename())
-	})
 
 	var on = false
 	var server *http.Server
-	buttonSwitch.Connect("toggled", func() {
+	buttonSwitch.Connect("clicked", func() {
 		// TODO: validate dir and port
 		port, _ := portInput.GetText()
-		dir, _ := dirInput.GetText()
+		dir := browseButton.GetFilename()
+		if dir == "" { dir = DEFAULT_DIR }
 
 		if on {
 			server.Shutdown(context.TODO())
+			statusLabel.SetMarkup("<span foreground='#ffcc00'>Server was terminated by user.</span>")
 		} else {
 			go func() {
 				killServerDone := &sync.WaitGroup{}
@@ -101,9 +97,8 @@ func onActivate(app *gtk.Application) {
 				// do this after server starts
 				on = true
 				buttonSwitch.SetLabel("Stop")
-				statusLabel.SetText(fmt.Sprintf("Serving directory '%s' on PORT %s", dir, port))
-				dirInput.SetEditable(false)
-				dirInput.SetCanFocus(false)
+				statusLabel.SetText(fmt.Sprintf("Serving\n%s\nOn http://localhost:%s", dir, port))
+				browseButton.SetCanFocus(false)
 				portInput.SetEditable(false)
 				portInput.SetCanFocus(false)
 
@@ -111,9 +106,7 @@ func onActivate(app *gtk.Application) {
 				// do this after server shuts down
 				on = false
 				buttonSwitch.SetLabel("Start")
-				statusLabel.SetText("")
-				dirInput.SetEditable(true)
-				dirInput.SetCanFocus(true)
+				browseButton.SetCanFocus(true)
 				portInput.SetEditable(true)
 				portInput.SetCanFocus(true)
 			}()
@@ -132,6 +125,15 @@ func onActivate(app *gtk.Application) {
 			if n < 0 || n > 65535 {
 				portInput.StopEmission("insert-text")
 			}
+		}
+	})
+
+	browseButton.Connect("selection-changed", func() {
+		/* when different directory is selected,
+		 * shut down the server and show warning message */
+		if on {
+			server.Shutdown(context.TODO())
+			statusLabel.SetMarkup("<span foreground='#ffcc00'>Server was terminated because root directory changed.</span>")
 		}
 	})
 
