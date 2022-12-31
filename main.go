@@ -97,7 +97,7 @@ func onActivate(app *gtk.Application) {
 				// do this after server starts
 				on = true
 				buttonSwitch.SetLabel("Stop")
-				statusLabel.SetMarkup(fmt.Sprintf("Serving\n%s\nOn <a href='http://localhost:%s'>http://localhost:%s</a>", dir, dir, port))
+				statusLabel.SetMarkup(fmt.Sprintf("Serving\n%s\nOn <a href=\"http://localhost:%s\">http://localhost:%s</a>", dir, port, port))
 				browseButton.SetCanFocus(false)
 				portInput.SetEditable(false)
 				portInput.SetCanFocus(false)
