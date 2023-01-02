@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	DEFAULT_PORT, DEFAULT_DIR, APP_VERSION string = "8080", ".", "v0.1.1"
+	DEFAULT_PORT, DEFAULT_DIR, APP_VERSION string = "8080", ".", "v0.2.0"
 )
 
 func serve(port, dir string, wg *sync.WaitGroup) *http.Server {
