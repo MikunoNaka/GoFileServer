@@ -1,4 +1,4 @@
-module github.com/MikunoNaka/gofileserver
+module github.com/MikunoNaka/GoFileServer
 
 go 1.19
 
