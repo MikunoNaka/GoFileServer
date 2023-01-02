@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	DEFAULT_PORT, DEFAULT_DIR string = "8080", "."
+	DEFAULT_PORT, DEFAULT_DIR, APP_VERSION string = "8080", ".", "v0.1.1"
 )
 
 func serve(port, dir string, wg *sync.WaitGroup) *http.Server {
@@ -25,6 +25,7 @@ func serve(port, dir string, wg *sync.WaitGroup) *http.Server {
 	if port == "" { port = DEFAULT_PORT }
 
     go func() {
+		wg.Add(1)
         defer wg.Done()
 
         if err := server.ListenAndServe(); err != http.ErrServerClosed {
@@ -67,8 +68,10 @@ func onActivate(app *gtk.Application) {
 	box.PackStart(portBox, false, false, 5)
 
 	buttonBox, _ := gtk.BoxNew(gtk.ORIENTATION_HORIZONTAL, 0)
+	aboutButton, _ := gtk.ButtonNewWithLabel("About")
+	buttonBox.PackStart(aboutButton, false, true, 5)
 	buttonSwitch, _ := gtk.ButtonNewWithLabel("Start")
-	buttonBox.PackStart(buttonSwitch, true, true, 0)
+	buttonBox.PackEnd(buttonSwitch, true, true, 5)
 	box.PackStart(buttonBox, false, false, 5)
 
 	statusLabel, _ := gtk.LabelNew("")
@@ -93,7 +96,7 @@ func onActivate(app *gtk.Application) {
 				killServerDone := &sync.WaitGroup{}
 				server = serve(port, dir, killServerDone)
 
-				killServerDone.Add(1)
+				//killServerDone.Add(1)
 				// do this after server starts
 				on = true
 				buttonSwitch.SetLabel("Stop")
@@ -135,6 +138,44 @@ func onActivate(app *gtk.Application) {
 			server.Shutdown(context.TODO())
 			statusLabel.SetMarkup("<span foreground='#ffcc00'>Server was terminated because root directory changed.</span>")
 		}
+	})
+
+	aboutButton.Connect("clicked", func() {
+		aboutWindow, _ := gtk.ApplicationWindowNew(app)
+		aboutWindow.SetTitle("About - GoFileServer")
+		aboutWindow.SetDefaultSize(420, 180)
+		aboutWindow.SetResizable(false)
+		aboutWindow.SetPosition(gtk.WIN_POS_MOUSE)
+
+		box, _ := gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 10)
+
+		titleLabel, _ := gtk.LabelNew("")
+		titleLabel.SetMarkup(fmt.Sprintf("<b>GoFileServer</b> <span color='lightgray'>%s</span>", APP_VERSION))
+		box.PackStart(titleLabel, true, true, 5)
+
+		copyrightLabel, _ := gtk.LabelNew("Copyright (c) 2022 Vidhu Kant Sharma")
+		box.PackStart(copyrightLabel, true, true, 5)
+
+		urlLabel, _ := gtk.LabelNew("")
+		urlLabel.SetMarkup("<a href='https://github.com/MikunoNaka/GoFileServer'>https://github.com/MikunoNaka/GoFileServer</a>")
+		box.PackStart(urlLabel, true, true, 5)
+
+		gplLabel, _ := gtk.LabelNew("")
+		gplLabel.SetMarkup("<span>This program comes with absolutely no warranty.\nSee the <a href='https://www.gnu.org/licenses/gpl-3.0.en.html'>GNU General Public License Version 3 or later</a> for details.</span>")
+		gplLabel.SetLineWrap(true)
+		gplLabel.SetLineWrapMode(pango.WrapMode(gtk.ALIGN_START))
+		gplLabel.SetJustify(gtk.JUSTIFY_CENTER)
+		box.PackStart(gplLabel, true, true, 5)
+
+		buttonBox, _ := gtk.BoxNew(gtk.ORIENTATION_HORIZONTAL, 5)
+		closeButton, _ := gtk.ButtonNewWithLabel("Close")
+		buttonBox.PackEnd(closeButton, false, true, 5)
+		box.PackEnd(buttonBox, true, true, 5)
+
+		closeButton.Connect("clicked", func() { aboutWindow.Close() })
+
+		aboutWindow.Add(box)
+		aboutWindow.ShowAll()
 	})
 
 	win.Add(box)
