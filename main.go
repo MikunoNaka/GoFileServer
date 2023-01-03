@@ -83,7 +83,12 @@ func onActivate(app *gtk.Application) {
 	var on = false
 	var server *http.Server
 	buttonSwitch.Connect("clicked", func() {
-		// TODO: validate dir and port
+		// clicking the button too fast too many times crashes the app
+		// this disables the button as long as the button is running
+		// user likely won't notice the button greying out or something
+		buttonSwitch.SetSensitive(false)
+		defer buttonSwitch.SetSensitive(true)
+
 		port, _ := portInput.GetText()
 		dir := browseButton.GetFilename()
 		if dir == "" { dir = DEFAULT_DIR }
