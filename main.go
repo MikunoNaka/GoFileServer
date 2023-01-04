@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"log"
+	//"log"
 	"strconv"
 	"sync"
 	"github.com/gotk3/gotk3/glib"
@@ -14,26 +14,37 @@ import (
 )
 
 var (
-	DEFAULT_PORT, DEFAULT_DIR, APP_VERSION string = "8080", ".", "v0.2.0"
+	DEFAULT_PORT, DEFAULT_DIR, APP_VERSION string = "1313", ".", "v0.3.0"
+	MAIN_WINDOW *gtk.ApplicationWindow
 )
 
-func serve(port, dir string, wg *sync.WaitGroup) *http.Server {
+func serve(port, dir string, label *gtk.Label) (*http.Server, *sync.WaitGroup) {
+	if port == "" { port = DEFAULT_PORT }
+	wg := &sync.WaitGroup{}
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.Dir(dir)))
     server := &http.Server{Addr: ":" + port, Handler: mux}
-
-	if port == "" { port = DEFAULT_PORT }
 
     go func() {
 		wg.Add(1)
         defer wg.Done()
 
         if err := server.ListenAndServe(); err != http.ErrServerClosed {
-			log.Fatalf("Error while running the server: %v\n", err)
+			errMsg := err.Error()
+			if errMsg == "listen tcp :" + port + ": bind: address already in use" {
+				errMsg = "Port " + port + " is already in use. Please use another port."
+			}
+
+			errDialog := gtk.MessageDialogNew(MAIN_WINDOW, gtk.DIALOG_DESTROY_WITH_PARENT, gtk.MESSAGE_ERROR, gtk.BUTTONS_CLOSE, "%s", errMsg)
+			errDialog.SetDefaultSize(400, 100)
+			errDialog.SetResizable(false)
+			errDialog.Connect("response", func() { errDialog.Destroy() })
+			errDialog.Show()
+				label.SetMarkup(fmt.Sprintf("<span foreground='#ffcc00'>Server shut down due to unexpected error.\n</span><span foreground='#ff0000'>%s</span>", errMsg))
         }
     }()
 
-    return server
+    return server, wg
 }
 
 
@@ -44,11 +55,11 @@ func main() {
 }
 
 func onActivate(app *gtk.Application) {
-	win, _ := gtk.ApplicationWindowNew(app)
-	win.SetTitle("HTTP File Server")
-	win.SetDefaultSize(330, 230)
-	win.SetResizable(false)
-	win.SetPosition(gtk.WIN_POS_CENTER)
+	MAIN_WINDOW, _ = gtk.ApplicationWindowNew(app)
+	MAIN_WINDOW.SetTitle("HTTP File Server")
+	MAIN_WINDOW.SetDefaultSize(330, 230)
+	MAIN_WINDOW.SetResizable(false)
+	MAIN_WINDOW.SetPosition(gtk.WIN_POS_CENTER)
 
 	box, _ := gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 0)
 
@@ -80,8 +91,11 @@ func onActivate(app *gtk.Application) {
 	statusLabel.SetJustify(gtk.JUSTIFY_CENTER)
 	box.PackStart(statusLabel, false, true, 10)
 
-	var on = false
-	var server *http.Server
+	var (
+		server *http.Server
+		wg *sync.WaitGroup
+	    on = false
+	)
 	buttonSwitch.Connect("clicked", func() {
 		// clicking the button too fast too many times crashes the app
 		// this disables the button as long as the button is running
@@ -98,8 +112,7 @@ func onActivate(app *gtk.Application) {
 			statusLabel.SetMarkup("<span foreground='#ffcc00'>Server was terminated by user.</span>")
 		} else {
 			go func() {
-				killServerDone := &sync.WaitGroup{}
-				server = serve(port, dir, killServerDone)
+				server, wg = serve(port, dir, statusLabel)
 
 				//killServerDone.Add(1)
 				// do this after server starts
@@ -108,15 +121,13 @@ func onActivate(app *gtk.Application) {
 				statusLabel.SetMarkup(fmt.Sprintf("Serving\n%s\nOn <a href=\"http://localhost:%s\">http://localhost:%s</a>", dir, port, port))
 				browseButton.SetCanFocus(false)
 				portInput.SetEditable(false)
-				portInput.SetCanFocus(false)
 
-				killServerDone.Wait()
+				wg.Wait()
 				// do this after server shuts down
 				on = false
 				buttonSwitch.SetLabel("Start")
 				browseButton.SetCanFocus(true)
 				portInput.SetEditable(true)
-				portInput.SetCanFocus(true)
 			}()
 		}
 	})
@@ -146,7 +157,7 @@ func onActivate(app *gtk.Application) {
 	})
 
 	aboutButton.Connect("clicked", func() {
-		aboutWindow, _ := gtk.ApplicationWindowNew(app)
+		aboutWindow, _ := gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
 		aboutWindow.SetTitle("About - GoFileServer")
 		aboutWindow.SetDefaultSize(420, 180)
 		aboutWindow.SetResizable(false)
@@ -155,7 +166,7 @@ func onActivate(app *gtk.Application) {
 		box, _ := gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 10)
 
 		titleLabel, _ := gtk.LabelNew("")
-		titleLabel.SetMarkup(fmt.Sprintf("<b>GoFileServer</b> <span color='lightgray'>%s</span>", APP_VERSION))
+		titleLabel.SetMarkup(fmt.Sprintf("<b>GoFileServer</b> %s", APP_VERSION))
 		box.PackStart(titleLabel, true, true, 5)
 
 		copyrightLabel, _ := gtk.LabelNew("Copyright (c) 2022 Vidhu Kant Sharma")
@@ -183,6 +194,6 @@ func onActivate(app *gtk.Application) {
 		aboutWindow.ShowAll()
 	})
 
-	win.Add(box)
-	win.ShowAll()
+	MAIN_WINDOW.Add(box)
+	MAIN_WINDOW.ShowAll()
 }
